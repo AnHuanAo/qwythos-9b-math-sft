@@ -197,6 +197,8 @@ def main() -> None:
             statements.append((r["id"], r["statement"]))
     if args.max_statements > 0:
         statements = statements[: args.max_statements]
+    if not statements:
+        raise SystemExit(f"没有读到任何定理陈述（{args.statements} 为空？）")
     print(f"[eval] {len(statements)} theorems, n={args.n}, k={args.k}")
 
     model, tok = load_model(args.model, args.adapter, args.quantize)

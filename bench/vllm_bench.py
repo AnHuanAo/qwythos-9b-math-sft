@@ -69,9 +69,18 @@ def run_offline(model_path: str, prompts: list[str], max_new_tokens: int,
     dt = _t.perf_counter() - t0
 
     total_tokens = sum(len(o.outputs[0].token_ids) for o in outputs)
-    latencies = [(_t.perf_counter() - o.metrics.first_token_time
-                  if o.metrics.first_token_time else float("nan"))
-                 for o in outputs]
+    # TTFT 尽量从 metrics 取；不同 vLLM 版本字段名不同，取不到就置 None
+    ttfts = []
+    for o in outputs:
+        try:
+            m = o.metrics
+            first = getattr(m, "first_token_time", None) or getattr(m, "first_ts", None)
+            arr = getattr(m, "arrival_time", None) or getattr(m, "arrival_ts", None)
+            if first is not None and arr is not None:
+                ttfts.append(first - arr)
+        except Exception:
+            pass
+    ttft_p50 = statistics.median(ttfts) if ttfts else None
 
     try:
         import torch
@@ -90,6 +99,7 @@ def run_offline(model_path: str, prompts: list[str], max_new_tokens: int,
         "throughput_req_per_s": round(len(prompts) / dt, 2),
         "throughput_tok_per_s": round(total_tokens / dt, 2),
         "total_output_tokens": total_tokens,
+        "ttft_p50_sec": ttft_p50,
         "vram_used_gb": vram_used,
         "vram_total_gb": vram_total,
     }
@@ -99,25 +109,40 @@ def run_offline(model_path: str, prompts: list[str], max_new_tokens: int,
 
 def _call_once(server: str, prompt: str, max_new_tokens: int,
                temperature: float) -> tuple[float, float, int, str]:
-    """返回 (ttft_sec, total_sec, output_tokens, error)。"""
+    """返回 (ttft_sec, total_sec, output_tokens, error)。TTFT 用流式首包测量。"""
     import requests
     payload = {
         "model": "/",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_new_tokens,
         "temperature": temperature,
+        "stream": True,
     }
     t0 = time.perf_counter()
     ttft = None
+    ntok = 0
     try:
-        resp = requests.post(server + "/chat/completions", json=payload, timeout=600)
+        with requests.post(server + "/chat/completions", json=payload,
+                           stream=True, timeout=600) as resp:
+            if resp.status_code != 200:
+                return float("nan"), float("nan"), 0, f"HTTP {resp.status_code}"
+            for raw in resp.iter_lines(decode_unicode=True):
+                if not raw or not raw.startswith("data: "):
+                    continue
+                chunk = raw[6:].strip()
+                if chunk == "[DONE]":
+                    break
+                try:
+                    data = json.loads(chunk)
+                    delta = data["choices"][0].get("delta", {}).get("content", "")
+                    if delta:
+                        if ttft is None:
+                            ttft = time.perf_counter() - t0
+                        ntok += len(delta.split())
+                except json.JSONDecodeError:
+                    continue
         dt = time.perf_counter() - t0
-        if resp.status_code != 200:
-            return float("nan"), float("nan"), 0, f"HTTP {resp.status_code}"
-        data = resp.json()
-        content = data["choices"][0]["message"]["content"]
-        ntok = len(content.split())
-        return ttft, dt, ntok, ""
+        return (ttft if ttft is not None else float("nan")), dt, ntok, ""
     except Exception as e:  # noqa: BLE001
         return float("nan"), float("nan"), 0, str(e)
 
@@ -134,6 +159,7 @@ def run_online(server: str, prompts: list[str], concurrency: list[int],
             results = [f.result() for f in futs]
         dt = time.perf_counter() - t0
         totals = [r[1] for r in results if r[1] == r[1]]
+        ttfts = [r[0] for r in results if r[0] == r[0]]
         ntok = sum(r[2] for r in results)
         return {
             "concurrency": c,
@@ -141,6 +167,9 @@ def run_online(server: str, prompts: list[str], concurrency: list[int],
             "total_sec": round(dt, 2),
             "throughput_req_per_s": round(len(results) / dt, 2),
             "throughput_tok_per_s": round(ntok / dt, 2),
+            "ttft_p50_sec": round(statistics.median(ttfts), 3) if ttfts else None,
+            "ttft_p95_sec": round(sorted(ttfts)[int(len(ttfts) * 0.95) - 1], 3)
+            if ttfts else None,
             "p50_latency_sec": round(statistics.median(totals), 3) if totals else None,
             "p95_latency_sec": round(sorted(totals)[int(len(totals) * 0.95) - 1], 3)
             if totals else None,
