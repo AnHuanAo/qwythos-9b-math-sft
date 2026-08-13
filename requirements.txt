@@ -1,0 +1,26 @@
+# ── mathpkg-sft 训练/评估环境（AutoDL RTX 5090, CUDA 12.8）──
+# 注意：torch 必须用 cu128 轮子，Blackwell(sm_120) 否则报 no kernel image：
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+# 版本需完全对齐：torch 2.8 ↔ torchaudio 2.8 ↔ torchvision 0.23
+
+torch>=2.7.0
+transformers>=4.50
+datasets>=3.0
+accelerate>=1.0
+trl>=0.16
+peft>=0.14
+bitsandbytes>=0.45        # 4bit QLoRA；sm_120 报错就 pip install -U bitsandbytes
+
+# Qwythos 混合注意力（Gated DeltaNet）专用算子——装上后 GPU 利用率 37%→100%；
+# 装不上也能训练，只是慢。causal-conv1d 需要与 torch 版本匹配的 wheel（见仓库根目录）。
+flash-linear-attention
+causal-conv1d
+
+# 辅助
+tensorboard
+pyyaml
+requests
+
+# 评估/部署（可选）
+vllm            # 推理 benchmark 用
+pynvml          # 显存监控（bench 用）

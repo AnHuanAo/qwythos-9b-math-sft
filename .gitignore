@@ -1,0 +1,30 @@
+# ── 数据（版权风险 + 体积大，一律不入库）──
+data/
+*.jsonl
+*.jsonl.gz
+
+# ── 大权重 / 模型产物 ──
+*.safetensors
+*.bin
+*.zip
+*.tar.xz
+adapter/
+output/
+merged/
+
+# ── Python ──
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# ── 环境与密钥 ──
+.env
+*sk-*
+
+# ── 本地工作文件 ──
+HANDOVER.md
+CLAUDE.md
+memory/
+# 注意：日志/ 目录下的训练/合并日志是实验证据，保留入库；运行期 *.log 噪音可单独忽略

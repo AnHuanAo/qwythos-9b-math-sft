@@ -1,0 +1,11 @@
+{
+  "mathpkg_v1_alpaca": {
+    "file_name": "train_alpaca.jsonl",
+    "formatting": "alpaca",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output"
+    }
+  }
+}

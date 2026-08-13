@@ -1,0 +1,27 @@
+{
+  "yaml_parse_fail": 724,
+  "concepts_total": 27741,
+  "concepts_with_intro": 27267,
+  "concepts_with_tex": 26924,
+  "proof_files": 13436,
+  "proof_no_concept": 63,
+  "proof_body_too_short": 69,
+  "proof_no_statement": 8,
+  "intro_body_too_short": 575,
+  "records_total": 40443,
+  "records_proof": 13277,
+  "records_explain": 27166,
+  "duplicates_removed": 19,
+  "by_domain": {
+    "algebra": 9149,
+    "analysis": 9820,
+    "applied-math": 1559,
+    "combinatorics": 1246,
+    "foundations": 2053,
+    "geometry": 3179,
+    "logic": 2430,
+    "number-theory": 3237,
+    "probability": 2953,
+    "topology": 4817
+  }
+}
