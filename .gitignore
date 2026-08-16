@@ -2,6 +2,7 @@
 data/
 *.jsonl
 *.jsonl.gz
+!samples/*.jsonl
 
 # ── 大权重 / 模型产物 ──
 *.safetensors
